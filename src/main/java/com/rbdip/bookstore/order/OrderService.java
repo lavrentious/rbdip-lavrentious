@@ -8,22 +8,21 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * God-класс: валидация, расчёт цены, персистентность и "уведомление
- * клиента" смешаны в одном методе. Цель для рефакторинга по SRP в ЛР1.
- */
 @Service
 public class OrderService {
 
+    private final OrderValidator orderValidator;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final PricingCalculator pricingCalculator = new PricingCalculator();
 
     public OrderService(
+            OrderValidator orderValidator,
             ProductRepository productRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository) {
+        this.orderValidator = orderValidator;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
@@ -31,15 +30,7 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(CreateOrderRequest request) {
-        if (request.customerFullName() == null || request.customerFullName().isBlank()) {
-            throw new IllegalArgumentException("customerFullName is required");
-        }
-        if (request.customerAddress() == null || request.customerAddress().isBlank()) {
-            throw new IllegalArgumentException("customerAddress is required");
-        }
-        if (request.items() == null || request.items().isEmpty()) {
-            throw new IllegalArgumentException("order must contain at least one item");
-        }
+        orderValidator.validate(request);
 
         List<Product> products = new ArrayList<>();
         List<PricingCalculator.LineItem> lineItems = new ArrayList<>();
