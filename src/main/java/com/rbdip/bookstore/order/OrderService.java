@@ -15,17 +15,20 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderNotificationService notificationService;
     private final PricingCalculator pricingCalculator = new PricingCalculator();
 
     public OrderService(
             OrderValidator orderValidator,
             ProductRepository productRepository,
             OrderRepository orderRepository,
-            OrderItemRepository orderItemRepository) {
+            OrderItemRepository orderItemRepository,
+            OrderNotificationService notificationService) {
         this.orderValidator = orderValidator;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -58,15 +61,8 @@ public class OrderService {
             orderItemRepository.save(new OrderItem(order.getId(), product.getName(), product.getPrice(), quantity));
         }
 
-        sendConfirmationEmail(request.customerFullName(), order.getId(), total);
+        notificationService.sendConfirmationEmail(request.customerFullName(), order.getId(), total);
 
         return order;
-    }
-
-    private void sendConfirmationEmail(String customerName, Long orderId, BigDecimal total) {
-        // Реальный почтовый транспорт не настроен в учебном проекте - здесь
-        // просто эмулируется побочный эффект отправки письма.
-        System.out.printf(
-                "[email] Dear %s, your order #%d for %s has been placed.%n", customerName, orderId, total);
     }
 }
