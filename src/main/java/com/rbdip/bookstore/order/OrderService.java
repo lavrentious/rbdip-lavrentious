@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class OrderService {
 
+    private static final String DEFAULT_CUSTOMER_TYPE = "regular";
+
     private final OrderValidator orderValidator;
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
@@ -37,34 +39,42 @@ public class OrderService {
     public Order createOrder(CreateOrderRequest request) {
         orderValidator.validate(request);
 
-        List<Product> products = new ArrayList<>();
-        List<PricingCalculator.LineItem> lineItems = new ArrayList<>();
-        for (CreateOrderRequest.Item raw : request.items()) {
-            Product product = productRepository.findById(raw.productId())
-                    .orElseThrow(() -> new IllegalArgumentException("product " + raw.productId() + " not found"));
-            int quantity = raw.quantity() == null ? 1 : raw.quantity();
-            if (quantity <= 0) {
-                throw new IllegalArgumentException("quantity must be positive");
-            }
-            products.add(product);
-            lineItems.add(new PricingCalculator.LineItem(product.getPrice(), quantity));
-        }
-
+        List<OrderLine> lines = resolveLines(request.items());
         BigDecimal total = pricingCalculator.calculateOrderTotal(
-                lineItems, request.customerType() == null ? "regular" : request.customerType(), request.couponCode());
+                pricingLines(lines),
+                request.customerType() == null ? DEFAULT_CUSTOMER_TYPE : request.customerType(),
+                request.couponCode());
 
-        Order order = new Order(
-                request.customerFullName(), request.customerAddress(), request.customerPhone(), "new");
-        order = orderRepository.save(order);
+        Order order = orderRepository.save(new Order(
+                request.customerFullName(),
+                request.customerAddress(),
+                request.customerPhone(),
+                Order.STATUS_NEW));
 
-        for (int i = 0; i < products.size(); i++) {
-            Product product = products.get(i);
-            int quantity = lineItems.get(i).quantity();
-            orderItemRepository.save(new OrderItem(order.getId(), product.getName(), product.getPrice(), quantity));
+        for (OrderLine line : lines) {
+            orderItemRepository.save(new OrderItem(
+                    order.getId(), line.product().getName(), line.product().getPrice(), line.quantity()));
         }
 
         notificationService.sendConfirmationEmail(request.customerFullName(), order.getId(), total);
 
         return order;
+    }
+
+    private List<OrderLine> resolveLines(List<CreateOrderRequest.Item> items) {
+        List<OrderLine> lines = new ArrayList<>();
+        for (CreateOrderRequest.Item item : items) {
+            Product product = productRepository.findById(item.productId())
+                    .orElseThrow(() -> new IllegalArgumentException("product " + item.productId() + " not found"));
+            int quantity = item.quantity() == null ? 1 : item.quantity();
+            lines.add(new OrderLine(product, quantity));
+        }
+        return lines;
+    }
+
+    private static List<PricingCalculator.LineItem> pricingLines(List<OrderLine> lines) {
+        return lines.stream()
+                .map(line -> new PricingCalculator.LineItem(line.product().getPrice(), line.quantity()))
+                .toList();
     }
 }
