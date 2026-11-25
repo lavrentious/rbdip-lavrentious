@@ -16,19 +16,21 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderNotificationService notificationService;
-    private final PricingCalculator pricingCalculator = new PricingCalculator();
+    private final PricingCalculator pricingCalculator;
 
     public OrderService(
             OrderValidator orderValidator,
             ProductRepository productRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
-            OrderNotificationService notificationService) {
+            OrderNotificationService notificationService,
+            PricingCalculator pricingCalculator) {
         this.orderValidator = orderValidator;
         this.productRepository = productRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.notificationService = notificationService;
+        this.pricingCalculator = pricingCalculator;
     }
 
     @Transactional
