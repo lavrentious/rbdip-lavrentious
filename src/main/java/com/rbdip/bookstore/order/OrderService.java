@@ -15,6 +15,7 @@ public class OrderService {
 
     private final OrderValidator orderValidator;
     private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final OrderNotificationService notificationService;
@@ -23,12 +24,14 @@ public class OrderService {
     public OrderService(
             OrderValidator orderValidator,
             ProductRepository productRepository,
+            CustomerRepository customerRepository,
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             OrderNotificationService notificationService,
             PricingCalculator pricingCalculator) {
         this.orderValidator = orderValidator;
         this.productRepository = productRepository;
+        this.customerRepository = customerRepository;
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.notificationService = notificationService;
@@ -45,11 +48,7 @@ public class OrderService {
                 request.customerType() == null ? DEFAULT_CUSTOMER_TYPE : request.customerType(),
                 request.couponCode());
 
-        Order order = orderRepository.save(new Order(
-                request.customerFullName(),
-                request.customerAddress(),
-                request.customerPhone(),
-                Order.STATUS_NEW));
+        Order order = orderRepository.save(new Order(resolveCustomer(request), Order.STATUS_NEW));
 
         for (OrderLine line : lines) {
             orderItemRepository.save(new OrderItem(
@@ -59,6 +58,12 @@ public class OrderService {
         notificationService.sendConfirmationEmail(request.customerFullName(), order.getId(), total);
 
         return order;
+    }
+
+    private Customer resolveCustomer(CreateOrderRequest request) {
+        return customerRepository.findByFullName(request.customerFullName())
+                .orElseGet(() -> customerRepository.save(new Customer(
+                        request.customerFullName(), request.customerAddress(), request.customerPhone())));
     }
 
     private List<OrderLine> resolveLines(List<CreateOrderRequest.Item> items) {
