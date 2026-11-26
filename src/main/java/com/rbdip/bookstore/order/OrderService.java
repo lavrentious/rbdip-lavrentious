@@ -51,8 +51,7 @@ public class OrderService {
         Order order = orderRepository.save(new Order(resolveCustomer(request), Order.STATUS_NEW));
 
         for (OrderLine line : lines) {
-            orderItemRepository.save(new OrderItem(
-                    order.getId(), line.product().getName(), line.product().getPrice(), line.quantity()));
+            orderItemRepository.save(new OrderItem(order.getId(), line.product(), line.quantity()));
         }
 
         notificationService.sendConfirmationEmail(request.customerFullName(), order.getId(), total);
